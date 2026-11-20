@@ -21,11 +21,14 @@ Isolated workspace for producing bilingual English voiceovers (with badge-free F
 `pierre-voice-engine` never auto-generates or invents slide visuals during narration runs. Place your slide asset in `slides_input/<slide_id>.mp4` (or `.png`) and narration script in `scripts_input/<slide_id>.txt`, then run from `C:\Anti-Gravity-Core\training-video-studio`:
 
 ```powershell
-# Render audio masters + 1920x1080 MP4 video (fails explicitly if slides_input/<id>.mp4|.png is missing)
-C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide phase3_sample
+# Single-sequence reusable run from existing slides_input/<id>.{mp4,png} and scripts_input/<id>.txt
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide hitl_autonomy_01
+
+# One-command reusable run staging an external slide export (.mp4/.png/.jpg) and inline [EN] script (auto-translates [FR] via Ollama + immediate keep_alive=0 if --fr omitted)
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide my_slide_01 --media-in C:\path\to\slide.mp4 --en "Your concise briefing script..."
 
 # Render mastered WAV + MP3 audio only (skip MP4 composition)
-C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide phase3_sample --audio-only
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide hitl_autonomy_01 --audio-only
 
 # Batch-process every script in scripts_input/
 C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --all --with-video

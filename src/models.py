@@ -68,6 +68,7 @@ class SlideVideoManifest:
     zoom_end: float
     slide_media_path: str = ""
     slide_media_type: str = "static_png"
+    fr_auto_translated: bool = False
 
     def to_dict(self) -> dict[str, object]:
         """Serializes manifest dataclass fields to a JSON-ready dictionary."""

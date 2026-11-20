@@ -6,7 +6,10 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import shutil
 import sys
+
+from PIL import Image
 
 from src.audio_master import master_slide_audio
 from src.models import SlideVideoManifest
@@ -49,6 +52,47 @@ def _discover_all_slide_ids() -> list[str]:
         if path.is_file() and path.suffix.lower() in {".txt", ".md"}:
             stems.setdefault(path.stem, path)
     return sorted(stems.keys())
+
+
+def stage_slide_inputs(
+    slide_id: str,
+    media_in: Path | None = None,
+    en_text: str | None = None,
+    fr_text: str | None = None,
+) -> None:
+    """Optionally copies provided slide media / scripts into `slides_input/` and `scripts_input/`."""
+    if media_in is not None:
+        src_path = media_in.resolve()
+        if not src_path.exists():
+            raise FileNotFoundError(f"Provided `--media-in` file does not exist: {src_path}")
+        SLIDES_DIR.mkdir(parents=True, exist_ok=True)
+        suffix = src_path.suffix.lower()
+        if suffix == ".mp4":
+            dst = SLIDES_DIR / f"{slide_id}.mp4"
+            if src_path != dst.resolve():
+                shutil.copy2(src_path, dst)
+        elif suffix == ".png":
+            dst = SLIDES_DIR / f"{slide_id}.png"
+            if src_path != dst.resolve():
+                shutil.copy2(src_path, dst)
+        elif suffix in {".jpg", ".jpeg", ".webp", ".bmp"}:
+            dst = SLIDES_DIR / f"{slide_id}.png"
+            with Image.open(src_path) as img:
+                img.convert("RGB").save(dst, format="PNG")
+        else:
+            raise ValueError(
+                f"Unsupported `--media-in` format '{src_path.suffix}'. Expected .mp4, .png, .jpg, or .webp."
+            )
+
+    if en_text is not None:
+        SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+        cleaned_en = " ".join(en_text.split())
+        if not cleaned_en:
+            raise ValueError("`--en` text cannot be empty.")
+        lines = ["[EN]", cleaned_en]
+        if fr_text is not None and fr_text.strip():
+            lines.extend(["", "[FR]", " ".join(fr_text.split())])
+        (SCRIPTS_DIR / f"{slide_id}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
@@ -124,6 +168,7 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
         zoom_end=zoom_end,
         slide_media_path=str(slide_media_path.resolve()) if slide_media_path is not None else "",
         slide_media_type=slide_media_type,
+        fr_auto_translated=bilingual.fr_auto_translated,
     )
 
     manifest_path = VIDEO_OUT_DIR / f"{slide_id}_manifest.json"
@@ -162,6 +207,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Synthesize EBU R128 mastered WAV + MP3 audio only without MP4 rendering.",
     )
+    parser.add_argument(
+        "--media-in",
+        type=Path,
+        default=None,
+        help="Optional external slide asset (.mp4 or .png/.jpg) to stage into `slides_input/<slide_id>`.",
+    )
+    parser.add_argument(
+        "--en",
+        type=str,
+        default=None,
+        help="Optional inline `[EN]` narration script to write to `scripts_input/<slide_id>.txt`.",
+    )
+    parser.add_argument(
+        "--fr",
+        type=str,
+        default=None,
+        help="Optional inline `[FR]` subtitle text (when omitted alongside `--en`, Ollama auto-translates).",
+    )
     return parser.parse_args(argv)
 
 
@@ -170,7 +233,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     with_video = not args.audio_only
 
-    slide_ids = _discover_all_slide_ids() if args.all else [args.slide.strip()]
+    if args.all and (args.media_in is not None or args.en is not None or args.fr is not None):
+        print("Error: `--media-in`, `--en`, and `--fr` require `--slide <slide_id>`.", file=sys.stderr)
+        return 2
+    if args.fr is not None and args.en is None:
+        print("Error: `--fr` inline override requires `--en`.", file=sys.stderr)
+        return 2
+
+    if args.slide is not None:
+        slide_id = args.slide.strip()
+        stage_slide_inputs(
+            slide_id=slide_id,
+            media_in=args.media_in,
+            en_text=args.en,
+            fr_text=args.fr,
+        )
+        slide_ids = [slide_id]
+    else:
+        slide_ids = _discover_all_slide_ids()
+
     if not slide_ids:
         print(f"No narration scripts found in {SCRIPTS_DIR}", file=sys.stderr)
         return 1

@@ -53,12 +53,30 @@ def _extract_sections(raw_text: str) -> tuple[str, str]:
     return _normalize_whitespace(" ".join(en_parts)), _normalize_whitespace(" ".join(fr_parts))
 
 
-def _translate_en_to_fr_via_ollama(en_text: str, timeout_sec: float = 45.0) -> str | None:
-    """Translates English narration to crisp technical French and immediately unloads VRAM."""
+def _unload_ollama_translation_model() -> None:
+    """Best-effort immediate VRAM unload after local Ollama translation."""
+    unload_payload = json.dumps(
+        {"model": OLLAMA_TRANSLATION_MODEL, "keep_alive": 0}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        OLLAMA_GENERATE_URL,
+        data=unload_payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            resp.read()
+    except (urllib.error.URLError, TimeoutError, OSError):
+        pass
+
+
+def _translate_en_to_fr_via_ollama(en_text: str, timeout_sec: float = 60.0) -> str | None:
+    """Translates English narration to concise Canadian French and immediately unloads VRAM."""
     prompt = (
         "Translate the following technical training slide narration into concise, "
         "natural French suitable for lower-third presentation subtitles. "
-        "Return ONLY the French translation with no quotes or preamble.\n\n"
+        "Return ONLY the French translation with no quotes, tags, or preamble.\n\n"
         f"{en_text}"
     )
     payload = json.dumps(
@@ -66,6 +84,7 @@ def _translate_en_to_fr_via_ollama(en_text: str, timeout_sec: float = 45.0) -> s
             "model": OLLAMA_TRANSLATION_MODEL,
             "prompt": prompt,
             "stream": False,
+            "think": False,
             "keep_alive": 0,
         }
     ).encode("utf-8")
@@ -83,8 +102,12 @@ def _translate_en_to_fr_via_ollama(en_text: str, timeout_sec: float = 45.0) -> s
             body = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError):
         return None
+    finally:
+        _unload_ollama_translation_model()
 
-    translated = _normalize_whitespace(str(body.get("response") or ""))
+    raw_response = str(body.get("response") or "")
+    raw_response = re.sub(r"<think>.*?</think>", "", raw_response, flags=re.DOTALL | re.IGNORECASE)
+    translated = _normalize_whitespace(raw_response).strip("\"'«» ")
     return translated if translated else None
 
 
