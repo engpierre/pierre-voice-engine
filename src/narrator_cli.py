@@ -11,7 +11,15 @@ import sys
 from src.audio_master import master_slide_audio
 from src.models import SlideVideoManifest
 from src.script_parser import build_fr_subtitle_chunks, parse_bilingual_script
-from src.slide_compositor import CANVAS_H, CANVAS_W, FPS, ZOOM_END, ZOOM_START, render_slide_video
+from src.slide_compositor import (
+    CANVAS_H,
+    CANVAS_W,
+    FPS,
+    STATIC_ZOOM_END,
+    STATIC_ZOOM_START,
+    render_slide_video,
+    resolve_slide_media_path,
+)
 from src.tts_client import synthesize_en_voiceover
 
 STUDIO_ROOT = Path(__file__).resolve().parents[1]
@@ -46,12 +54,18 @@ def _discover_all_slide_ids() -> list[str]:
 def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
     """Runs script parsing, Qwen3-TTS synthesis, EBU R128 mastering, and 16:9 composition."""
     script_path = _resolve_script_path(slide_id)
-    slide_png_path = SLIDES_DIR / f"{slide_id}.png"
+    slide_png_candidate = SLIDES_DIR / f"{slide_id}.png"
 
-    if with_video and not slide_png_path.exists():
-        raise FileNotFoundError(
-            f"Slide PNG required for `--with-video` is missing: {slide_png_path}"
-        )
+    slide_media_path: Path | None = None
+    slide_media_type = "none"
+    if with_video:
+        slide_media_path, slide_media_type = resolve_slide_media_path(SLIDES_DIR, slide_id)
+    else:
+        try:
+            slide_media_path, slide_media_type = resolve_slide_media_path(SLIDES_DIR, slide_id)
+        except FileNotFoundError:
+            slide_media_path = None
+            slide_media_type = "none"
 
     bilingual = parse_bilingual_script(script_path=script_path, slide_id=slide_id)
 
@@ -74,9 +88,10 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
 
     rendered_mp4_path: str | None = None
     if with_video:
+        assert slide_media_path is not None
         mp4_path = render_slide_video(
             slide_id=slide_id,
-            slide_png_path=slide_png_path,
+            slide_media_path=slide_media_path,
             master_wav_path=Path(master.master_wav_path),
             duration_sec=master.mastered_duration_sec,
             subtitle_chunks=subtitle_chunks,
@@ -84,11 +99,14 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
         )
         rendered_mp4_path = str(mp4_path.resolve())
 
+    zoom_start = STATIC_ZOOM_START if slide_media_type == "static_png" else 1.0
+    zoom_end = STATIC_ZOOM_END if slide_media_type == "static_png" else 1.0
+
     manifest = SlideVideoManifest(
         generated_at_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         slide_id=slide_id,
         script_path=bilingual.source_path,
-        slide_png_path=str(slide_png_path.resolve()) if slide_png_path.exists() else "",
+        slide_png_path=str(slide_png_candidate.resolve()) if slide_png_candidate.exists() else "",
         en_word_count=bilingual.en_word_count,
         fr_subtitle_chunks=len(subtitle_chunks),
         audio_wav_path=master.master_wav_path,
@@ -101,8 +119,10 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
         max_volume_db=master.max_volume_db,
         resolution=f"{CANVAS_W}x{CANVAS_H}",
         fps=FPS,
-        zoom_start=ZOOM_START,
-        zoom_end=ZOOM_END,
+        zoom_start=zoom_start,
+        zoom_end=zoom_end,
+        slide_media_path=str(slide_media_path.resolve()) if slide_media_path is not None else "",
+        slide_media_type=slide_media_type,
     )
 
     manifest_path = VIDEO_OUT_DIR / f"{slide_id}_manifest.json"

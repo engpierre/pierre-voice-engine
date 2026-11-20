@@ -66,6 +66,8 @@ class SlideVideoManifest:
     fps: int
     zoom_start: float
     zoom_end: float
+    slide_media_path: str = ""
+    slide_media_type: str = "static_png"
 
     def to_dict(self) -> dict[str, object]:
         """Serializes manifest dataclass fields to a JSON-ready dictionary."""

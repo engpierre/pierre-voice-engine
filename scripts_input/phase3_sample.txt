@@ -1,0 +1,6 @@
+[EN]
+Joint operational readiness across maritime, land, and aerospace domains depends on synchronized telemetry from every distributed command cell. Whether coordinating naval acoustic sensors, mechanized army field communications, or air force tactical tracks, commanders require immediate, uninterrupted status visibility across the theater. Every training module pairs English executive narration mastered to minus fourteen LUFS with clean French lower-third subtitles, ensuring bilingual joint personnel maintain rapid shared situational awareness without visual clutter on modern widescreen mission command consoles.
+
+[FR]
+La disponibilité opérationnelle interarmées repose sur une télémétrie synchronisée entre les composantes maritime, terrestre et aérospatiale. Qu'il s'agisse de capteurs navals, de transmissions terrestres ou de suivi aérien, le commandement exige une visibilité immédiate et continue. Chaque module associe une narration anglaise masterisée à -14 LUFS à des sous-titres français épurés, assurant une conscience situationnelle partagée sans surcharge visuelle sur console grand écran.
+
