@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+*.bak
+*.tmp
+
+# Ephemeral media artifacts (preserve .gitkeep)
+audio_out/*.wav
+audio_out/*.mp3
+video_out/*.mp4
+!audio_out/.gitkeep
+!video_out/.gitkeep
