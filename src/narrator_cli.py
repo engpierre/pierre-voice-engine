@@ -52,13 +52,14 @@ def _discover_all_slide_ids() -> list[str]:
 
 
 def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
-    """Runs script parsing, Qwen3-TTS synthesis, EBU R128 mastering, and 16:9 composition."""
+    """Pairs an existing slide asset in `slides_input/` with narration audio & `[FR]` subtitles."""
     script_path = _resolve_script_path(slide_id)
     slide_png_candidate = SLIDES_DIR / f"{slide_id}.png"
 
     slide_media_path: Path | None = None
     slide_media_type = "none"
     if with_video:
+        # Fail fast before TTS boot if no externally authored `.mp4` or `.png` slide exists.
         slide_media_path, slide_media_type = resolve_slide_media_path(SLIDES_DIR, slide_id)
     else:
         try:

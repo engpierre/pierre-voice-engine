@@ -44,8 +44,8 @@ def resolve_slide_media_path(slides_dir: Path, slide_id: str) -> tuple[Path, str
         return png_candidate, "static_png"
 
     raise FileNotFoundError(
-        f"No slide media found for '{slide_id}' in {slides_dir} "
-        f"(checked {mp4_candidate.name} and {png_candidate.name})"
+        f"Missing slide media for '{slide_id}': place an animated clip at "
+        f"{mp4_candidate} or a static slide at {png_candidate}"
     )
 
 
