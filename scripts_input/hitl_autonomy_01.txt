@@ -1,0 +1,6 @@
+[EN]
+This slide maps the AI autonomy spectrum across defense operations. On the left, probabilistic systems—such as generative LLMs and reasoning engines—draft briefings, code, and translations, but require strict human-in-the-loop approval because decision authority cannot be delegated. On the right, deterministic engines and multi-agent swarms handle OSINT aggregation, cyber isolation, and fleet forecasting under human-on-the-loop supervision, bounded by hard-coded rules of engagement and a mandatory kill-switch.
+
+[FR]
+Cette diapositive illustre le spectre d'autonomie de l'IA dans les opérations de défense. À gauche, les systèmes probabilistes — comme les grands modèles de langage et moteurs de raisonnement — rédigent des breffages, du code et des traductions, mais exigent une approbation humaine stricte, car le pouvoir décisionnel ne peut être délégué. À droite, les moteurs déterministes et essaims multi-agents gèrent l'agrégation OSINT, l'isolation cybernétique et la prévision de flotte sous supervision humaine, encadrés par des règles d'engagement strictes et un arrêt d'urgence obligatoire.
+
