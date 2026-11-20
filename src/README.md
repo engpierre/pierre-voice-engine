@@ -1,13 +1,10 @@
-# `src/` — Training Voiceover & Slide Sync Architecture (Phase 2 Blueprint)
+# `src/` — Bilingual Training Slide Narrator (Phase 2)
 
-## Planned Modules
+## Implemented Modules
 
-1. **Script & Slide Manifest Parser:**
-   - Parses per-slide Markdown/JSON narration scripts under `../scripts_input/` and pairs them deterministically with presentation slide PNGs in `../slides_input/`.
-2. **Read-Only Shared Voice Synthesis Client:**
-   - Connects strictly as a consumer to the existing Qwen3-TTS server (`C:\Anti-Gravity-Core\pierre-training-video\voice_studio\tts_server.py` on `http://127.0.0.1:7861`, pinned to `cuda:1`) using read-only voice references (`pierre_ref.wav` / `pierre_ref_master.wav`).
-   - Enforces automatic `tts_server.py` teardown immediately after synthesis so `GPU 0` (`cuda:0`) and `GPU 1` (`cuda:1`) return to `0 MiB` studio allocation.
-3. **EBU R128 + `atempo=1.04x` Mastering Pipeline:**
-   - Normalizes raw voice tracks to broadcast loudness (`-14.0 LUFS`, `-1.5 dB TP`) with natural `atempo=1.04x` tempo scaling into `../audio_out/` (`.wav` / `.mp3`).
-4. **Slide-to-Video Composer:**
-   - Synchronizes slide transitions to mastered per-slide audio durations and encodes crisp H.264/AAC MP4 training modules into `../video_out/`.
+1. [`models.py`](models.py) — Immutable `@dataclass(slots=True, frozen=True)` data contracts (`BilingualScript`, `SubtitleChunk`, `AudioMasterResult`, `SlideVideoManifest`).
+2. [`script_parser.py`](script_parser.py) — Parses `[EN]` / `[FR]` sections (`<= 115` `[EN]` words ceiling), supports optional local Ollama (`keep_alive: 0`) translation fallback, and generates time-aligned French lower-third `SubtitleChunk` intervals.
+3. [`tts_client.py`](tts_client.py) — Enforces `>= 6000 MiB` free VRAM on `GPU 1` (`cuda:1`), boots `voice_studio/tts_server.py` (`127.0.0.1:7861`) ephemerally, synthesizes `pierre-clone-en-Male` (`pierre_ref.wav`), and guarantees teardown inside `try...finally`.
+4. [`audio_master.py`](audio_master.py) — FFmpeg 9.0 EBU R128 loudness mastering (`I=-14.0 LUFS`, `TP=-1.5 dB`, `LRA=11.0`) + `atempo=1.04x` + peak limiter into `../audio_out/<slide_id>.wav` & `.mp3` (`<= 45.0s` cap) with `volumedetect` verification.
+5. [`slide_compositor.py`](slide_compositor.py) — Streams `1920x1080` 30fps frames with smooth `1.00x -> 1.03x` sub-pixel zoom drift and dark obsidian `[FR]` lower-third cards directly to FFmpeg H.264/AAC MP4 in `../video_out/<slide_id>.mp4`.
+6. [`narrator_cli.py`](narrator_cli.py) — End-to-end CLI supporting `--slide <id>`, `--all`, `--audio-only`, and `--with-video`, emitting `../video_out/<slide_id>_manifest.json`.

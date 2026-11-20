@@ -1,0 +1,5 @@
+[EN]
+Modern multi-GPU AI pipelines fail when model weights compete silently for shared memory. By enforcing strict hardware isolation, reasoning engines stay cleanly separated while speech synthesis boots ephemerally on GPU one with deterministic teardown. After synthesis completes, worker processes exit cleanly so device memory returns to zero allocation. Every training narration track is mastered to minus fourteen LUFS broadcast loudness, protected below minus one point five decibels true peak, and delivered at a steady one point zero four tempo cadence for crisp technical briefings.
+
+[FR]
+Les pipelines d'IA multi-GPU échouent lorsque les poids des modèles se disputent la mémoire partagée. Grâce à une isolation matérielle stricte, le raisonnement reste cloisonné tandis que la synthèse vocale démarre temporairement sur le GPU 1. Après la synthèse, les processus s'arrêtent proprement afin de libérer toute la mémoire vidéo. Chaque piste audio est masterisée à -14 LUFS selon la norme EBU R128, plafonnée à -1,5 dBTP et diffusée à 1,04x pour une clarté optimale.

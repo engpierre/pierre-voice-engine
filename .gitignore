@@ -10,5 +10,7 @@ __pycache__/
 audio_out/*.wav
 audio_out/*.mp3
 video_out/*.mp4
+video_out/*_manifest.json
 !audio_out/.gitkeep
 !video_out/.gitkeep
+
