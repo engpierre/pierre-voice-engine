@@ -30,14 +30,19 @@ C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe
 # Render mastered WAV + MP3 audio only (skip MP4 composition)
 C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide hitl_autonomy_01 --audio-only
 
+# Custom lead-in silence (default 1.5s) and final-only MP4 export destination (default OneDrive folder)
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide hitl_autonomy_01 --lead-in-sec 1.5 --export-dir "C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide"
+
 # Batch-process every script in scripts_input/
 C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --all --with-video
 ```
 
 ---
 
-## 3. Animated Slide Input & Lower-Third Subtitle Spec
+## 3. Animated Slide Input, Voice Lead-In & Lower-Third Subtitle Spec
 
+- **1.5s Voice Lead-In (Pre-Roll):** Mastered audio inserts `1.5s` of digital silence via FFmpeg `adelay` after EBU R128 loudness normalization. Subtitles begin strictly at `t = lead_in_sec` (clean silent slide view during pre-roll) to guarantee opening syllables are never clipped during PowerPoint slide transitions.
+- **Final-Only MP4 OneDrive Export:** Upon completion, `narrator_cli.py` copies **strictly and exclusively** the final `<slide_id>.mp4` to `--export-dir` (`C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide`), leaving intermediate `.wav`, `.mp3`, and `.json` files cleanly isolated in studio working directories.
 - **Veo / Animated `.mp4` Preference:** When `slides_input/<slide_id>.mp4` exists, `slide_compositor.py` normalizes it to `1920x1080` at `30 fps` and loops/trims cleanly to the mastered audio duration without adding artificial zoom distortion. Static `.png` inputs retain the smooth `1.00x -> 1.03x` zoom/drift fallback.
 - **Clean French Subtitles:** Lower-third strips display crisp centered French text over a dark translucent pill (`rgba(8, 16, 28, 224)`) with zero `FR` badge boxes and safe 16:9 PowerPoint bottom margins.
 

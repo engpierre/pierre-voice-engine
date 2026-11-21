@@ -31,6 +31,9 @@ SLIDES_DIR = STUDIO_ROOT / "slides_input"
 AUDIO_OUT_DIR = STUDIO_ROOT / "audio_out"
 VIDEO_OUT_DIR = STUDIO_ROOT / "video_out"
 
+DEFAULT_LEAD_IN_SEC = 1.5
+DEFAULT_EXPORT_DIR = Path(r"C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide")
+
 
 def _resolve_script_path(slide_id: str) -> Path:
     """Locates `<slide_id>.txt` or `<slide_id>.md` inside `scripts_input/`."""
@@ -95,7 +98,12 @@ def stage_slide_inputs(
         (SCRIPTS_DIR / f"{slide_id}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
+def process_slide(
+    slide_id: str,
+    with_video: bool = True,
+    lead_in_sec: float = DEFAULT_LEAD_IN_SEC,
+    export_dir: Path | None = DEFAULT_EXPORT_DIR,
+) -> SlideVideoManifest:
     """Pairs an existing slide asset in `slides_input/` with narration audio & `[FR]` subtitles."""
     script_path = _resolve_script_path(slide_id)
     slide_png_candidate = SLIDES_DIR / f"{slide_id}.png"
@@ -124,11 +132,13 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
         raw_wav_path=raw_wav_path,
         audio_out_dir=AUDIO_OUT_DIR,
         remove_raw=True,
+        lead_in_sec=lead_in_sec,
     )
 
     subtitle_chunks = build_fr_subtitle_chunks(
         fr_text=bilingual.fr_text,
         total_duration_sec=master.mastered_duration_sec,
+        lead_in_sec=lead_in_sec,
     )
 
     rendered_mp4_path: str | None = None
@@ -143,6 +153,13 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
             video_out_dir=VIDEO_OUT_DIR,
         )
         rendered_mp4_path = str(mp4_path.resolve())
+
+    exported_mp4_path: str | None = None
+    if with_video and rendered_mp4_path is not None and export_dir is not None:
+        export_dir.mkdir(parents=True, exist_ok=True)
+        target_mp4 = export_dir / f"{slide_id}.mp4"
+        shutil.copy2(rendered_mp4_path, target_mp4)
+        exported_mp4_path = str(target_mp4.resolve())
 
     zoom_start = STATIC_ZOOM_START if slide_media_type == "static_png" else 1.0
     zoom_end = STATIC_ZOOM_END if slide_media_type == "static_png" else 1.0
@@ -169,6 +186,8 @@ def process_slide(slide_id: str, with_video: bool = True) -> SlideVideoManifest:
         slide_media_path=str(slide_media_path.resolve()) if slide_media_path is not None else "",
         slide_media_type=slide_media_type,
         fr_auto_translated=bilingual.fr_auto_translated,
+        lead_in_sec=lead_in_sec,
+        exported_mp4_path=exported_mp4_path,
     )
 
     manifest_path = VIDEO_OUT_DIR / f"{slide_id}_manifest.json"
@@ -225,6 +244,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional inline `[FR]` subtitle text (when omitted alongside `--en`, Ollama auto-translates).",
     )
+    parser.add_argument(
+        "--lead-in-sec",
+        type=float,
+        default=DEFAULT_LEAD_IN_SEC,
+        help="Silent voice pre-roll duration in seconds (default: 1.5s for PowerPoint playback).",
+    )
+    parser.add_argument(
+        "--export-dir",
+        type=str,
+        default=str(DEFAULT_EXPORT_DIR),
+        help="Destination directory for final PowerPoint MP4 only (default: OneDrive folder). Pass 'none' to disable.",
+    )
     return parser.parse_args(argv)
 
 
@@ -232,6 +263,13 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for `python -m src.narrator_cli`."""
     args = parse_args(argv)
     with_video = not args.audio_only
+
+    export_dir_str = (args.export_dir or "").strip()
+    export_dir = (
+        None
+        if export_dir_str.lower() in {"none", "false", "null", "no", ""}
+        else Path(export_dir_str)
+    )
 
     if args.all and (args.media_in is not None or args.en is not None or args.fr is not None):
         print("Error: `--media-in`, `--en`, and `--fr` require `--slide <slide_id>`.", file=sys.stderr)
@@ -258,7 +296,12 @@ def main(argv: list[str] | None = None) -> int:
 
     manifests: list[dict[str, object]] = []
     for slide_id in slide_ids:
-        manifest = process_slide(slide_id=slide_id, with_video=with_video)
+        manifest = process_slide(
+            slide_id=slide_id,
+            with_video=with_video,
+            lead_in_sec=args.lead_in_sec,
+            export_dir=export_dir,
+        )
         manifests.append(manifest.to_dict())
 
     print(json.dumps(manifests if len(manifests) > 1 else manifests[0], indent=2))

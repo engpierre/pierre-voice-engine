@@ -239,6 +239,7 @@ def build_fr_subtitle_chunks(
     fr_text: str,
     total_duration_sec: float,
     max_words_per_chunk: int = 12,
+    lead_in_sec: float = 0.0,
 ) -> list[SubtitleChunk]:
     """Splits `[FR]` text into 1-2 line lower-third cards aligned proportionally across duration."""
     if total_duration_sec <= 0.0:
@@ -259,13 +260,16 @@ def build_fr_subtitle_chunks(
     weights = [max(1, len(seg)) for seg in segments]
     total_weight = float(sum(weights))
 
+    safe_lead_in = max(0.0, min(lead_in_sec, total_duration_sec - 0.5))
+    active_duration = max(0.5, total_duration_sec - safe_lead_in)
+
     chunks: list[SubtitleChunk] = []
-    cursor_sec = 0.0
+    cursor_sec = safe_lead_in
     for idx, (seg_text, weight) in enumerate(zip(segments, weights), start=1):
         if idx == len(segments):
             end_sec = round(total_duration_sec, 3)
         else:
-            seg_dur = total_duration_sec * (weight / total_weight)
+            seg_dur = active_duration * (weight / total_weight)
             end_sec = round(min(total_duration_sec, cursor_sec + seg_dur), 3)
         chunks.append(
             SubtitleChunk(

@@ -131,26 +131,32 @@ def _start_tts_server() -> subprocess.Popen[bytes] | None:
     if WINGET_FFMPEG_BIN_DIR.exists() and ffmpeg_dir not in env.get("PATH", ""):
         env["PATH"] = f"{ffmpeg_dir}{os.pathsep}{env.get('PATH', '')}"
 
-    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+    log_path = Path(__file__).resolve().parent.parent / "tts_server.log"
+    log_file = open(log_path, "a", encoding="utf-8")
+    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
     proc = subprocess.Popen(
         [str(VOICE_STUDIO_PYTHON), str(VOICE_STUDIO_SERVER)],
         cwd=str(VOICE_STUDIO_SERVER.parent),
         env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
         creationflags=creationflags,
     )
 
     deadline = time.monotonic() + 120.0
     while time.monotonic() < deadline:
         if proc.poll() is not None:
+            log_file.flush()
+            log_file.close()
             raise RuntimeError(
-                f"tts_server.py exited prematurely during startup (rc={proc.returncode})."
+                f"tts_server.py exited prematurely during startup (rc={proc.returncode}). Check {log_path}."
             )
         if check_tts_health(timeout_sec=3.0):
             return proc
         time.sleep(1.5)
 
+    log_file.flush()
+    log_file.close()
     raise TimeoutError(f"Timed out after 120s waiting for {TTS_BASE_URL}/health")
 
 

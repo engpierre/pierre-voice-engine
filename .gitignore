@@ -5,6 +5,7 @@ __pycache__/
 .env
 *.bak
 *.tmp
+*.log
 
 # Ephemeral media artifacts (preserve .gitkeep)
 audio_out/*.wav

@@ -42,6 +42,7 @@ class AudioMasterResult:
     mean_volume_db: float
     max_volume_db: float
     target_lufs: float
+    lead_in_sec: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -69,6 +70,8 @@ class SlideVideoManifest:
     slide_media_path: str = ""
     slide_media_type: str = "static_png"
     fr_auto_translated: bool = False
+    lead_in_sec: float = 0.0
+    exported_mp4_path: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Serializes manifest dataclass fields to a JSON-ready dictionary."""

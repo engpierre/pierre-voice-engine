@@ -27,6 +27,7 @@ TARGET_TP_DB = -1.5
 TARGET_LRA = 11.0
 ATEMPO_FACTOR = 1.04
 MAX_DURATION_SEC = 45.0
+DEFAULT_LEAD_IN_SEC = 1.5
 SAMPLE_RATE_HZ = 44100
 CHANNELS = 2
 
@@ -160,8 +161,9 @@ def master_slide_audio(
     raw_wav_path: Path,
     audio_out_dir: Path,
     remove_raw: bool = True,
+    lead_in_sec: float = DEFAULT_LEAD_IN_SEC,
 ) -> AudioMasterResult:
-    """Applies two-pass linear EBU R128 + `1.04x` tempo mastering to `.wav` and `.mp3`."""
+    """Applies two-pass linear EBU R128 + `1.04x` tempo mastering with lead-in pre-roll."""
     if not raw_wav_path.exists():
         raise FileNotFoundError(f"Raw TTS WAV missing: {raw_wav_path}")
 
@@ -174,6 +176,9 @@ def master_slide_audio(
     raw_duration_sec = probe_duration_sec(raw_wav_path)
     stats = _measure_loudnorm_pass1(ffmpeg_bin, raw_wav_path)
 
+    delay_ms = int(round(max(0.0, lead_in_sec) * 1000))
+    delay_stage = f"adelay={delay_ms}|{delay_ms}:all=1," if delay_ms > 0 else ""
+
     pass2_chain = (
         f"{SILENCEREMOVE_FILTER},"
         f"atempo={ATEMPO_FACTOR:.2f},"
@@ -184,6 +189,7 @@ def master_slide_audio(
         f"measured_LRA={stats['input_lra']}:measured_thresh={stats['input_thresh']}:"
         f"offset={stats['target_offset']}:linear=true:print_format=none,"
         f"aresample={SAMPLE_RATE_HZ},"
+        f"{delay_stage}"
         "alimiter=limit=0.84:level=false:asc=false,"
         "aformat=sample_fmts=s16:channel_layouts=stereo"
     )
@@ -254,4 +260,5 @@ def master_slide_audio(
         mean_volume_db=mean_volume_db,
         max_volume_db=max_volume_db,
         target_lufs=TARGET_LUFS,
+        lead_in_sec=lead_in_sec,
     )
