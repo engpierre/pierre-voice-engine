@@ -1,0 +1,6 @@
+[EN]
+True AI fluency relies on three dynamic prompting sequences rather than single-shot queries. First, Layered Prompting builds context sequentially—stacking role, constraints, and task parameters to prevent cognitive overload. Second, Chunking Sequences break complex analytical problems into distinct stages so you can verify intermediate outputs before compounding context. Finally, Iterative Steering maintains a conversational loop, treating the model as an active thought partner through continuous calibration.
+
+[FR]
+La véritable maîtrise de l'IA repose sur trois séquences dynamiques plutôt que sur des requêtes uniques. D'abord, le guidage par couches structure le contexte progressivement — en empilant rôle, contraintes et paramètres — pour éviter la surcharge cognitive. Ensuite, le séquençage par blocs divise les analyses complexes en étapes distinctes afin de valider les résultats intermédiaires. Enfin, le pilotage itératif maintient un dialogue continu pour calibrer le modèle en véritable partenaire de réflexion.
+
