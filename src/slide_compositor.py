@@ -34,6 +34,10 @@ TEXT_WHITE_RGBA = (255, 255, 255, 255)
 
 DEFAULT_SUBTITLE_Y = 0.91
 DEFAULT_SUBTITLE_FONT_SIZE = 46
+AVATAR_OVERLAY_W = 170
+AVATAR_OVERLAY_H = 170
+AVATAR_RIGHT_INSET_PCT = 0.10
+AVATAR_TOP_INSET_PCT = 0.11
 
 
 def resolve_slide_media_path(slides_dir: Path, slide_id: str) -> tuple[Path, str]:
@@ -66,6 +70,47 @@ def _load_font(bold: bool, size: int) -> ImageFont.FreeTypeFont | ImageFont.Imag
             except OSError:
                 continue
     return ImageFont.load_default()
+
+
+def _compute_slide_canvas_rect(media_path: Path, is_animated: bool) -> tuple[int, int, int, int]:
+    """Computes the active `(slide_x, slide_y, slide_w, slide_h)` fitted inside 1920x1080."""
+    src_w, src_h = CANVAS_W, CANVAS_H
+    if is_animated:
+        ffprobe_bin = resolve_ffmpeg_tool("ffprobe")
+        proc = subprocess.run(
+            [
+                ffprobe_bin,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=s=x:p=0",
+                str(media_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if proc.returncode == 0 and "x" in proc.stdout:
+            try:
+                w_str, h_str = proc.stdout.strip().splitlines()[0].split("x", 1)
+                src_w, src_h = max(1, int(w_str)), max(1, int(h_str))
+            except ValueError:
+                pass
+    else:
+        with Image.open(media_path) as src:
+            src_w, src_h = src.size
+
+    scale = min(CANVAS_W / src_w, CANVAS_H / src_h)
+    slide_w = max(1, int(round(src_w * scale)))
+    slide_h = max(1, int(round(src_h * scale)))
+    slide_x = (CANVAS_W - slide_w) // 2
+    slide_y = (CANVAS_H - slide_h) // 2
+    return slide_x, slide_y, slide_w, slide_h
 
 
 def _prepare_base_slide(slide_png_path: Path) -> Image.Image:
@@ -242,8 +287,12 @@ def render_slide_video(
     slide_png_path: Path | None = None,
     subtitle_y: float = DEFAULT_SUBTITLE_Y,
     subtitle_font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
+    avatar_mp4_path: Path | None = None,
+    avatar_matte_path: Path | None = None,
+    lead_in_sec: float = 1.5,
+    tail_out_sec: float = 1.5,
 ) -> Path:
-    """Renders 1920x1080 30fps H.264/AAC MP4 from animated `.mp4` (Veo) or static `.png` slide."""
+    """Renders 1920x1080 30fps H.264/AAC MP4 with optional speech-windowed avatar overlay."""
     resolved_media = slide_media_path or slide_png_path
     if resolved_media is None:
         raise ValueError("Either `slide_media_path` or `slide_png_path` must be supplied.")
@@ -272,6 +321,13 @@ def render_slide_video(
     total_frames = max(1, int(math.ceil(duration_sec * FPS)))
     is_animated = resolved_media.suffix.lower() in ANIMATED_EXTENSIONS
 
+    use_avatar = (
+        avatar_mp4_path is not None
+        and avatar_matte_path is not None
+        and avatar_mp4_path.exists()
+        and avatar_matte_path.exists()
+    )
+
     enc_cmd = [
         ffmpeg_bin,
         "-y",
@@ -292,23 +348,69 @@ def render_slide_video(
         "-",
         "-i",
         str(master_wav_path),
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-crf",
-        "18",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-movflags",
-        "+faststart",
-        "-shortest",
-        str(output_mp4),
     ]
+
+    if use_avatar:
+        assert avatar_mp4_path is not None and avatar_matte_path is not None
+        slide_x, slide_y, slide_w, slide_h = _compute_slide_canvas_rect(resolved_media, is_animated)
+        overlay_w, overlay_h = AVATAR_OVERLAY_W, AVATAR_OVERLAY_H
+        right_inset = int(round(slide_w * AVATAR_RIGHT_INSET_PCT))
+        top_inset = int(round(slide_h * AVATAR_TOP_INSET_PCT))
+        avatar_x = slide_x + slide_w - overlay_w - right_inset
+        avatar_y = slide_y + top_inset
+        print(
+            f"[SlideCompositor] slide_canvas=({slide_x}, {slide_y}, {slide_w}, {slide_h}) "
+            f"avatar_overlay=(x={avatar_x}, y={avatar_y}) size=({overlay_w}, {overlay_h})",
+            flush=True,
+        )
+
+        speech_end_sec = max(lead_in_sec + 0.5, duration_sec - max(0.0, tail_out_sec))
+        fade_out_st = max(lead_in_sec, speech_end_sec - 0.20)
+        filter_complex = (
+            f"[2:v]crop=ih:ih:(iw-ih)/2:0,scale={overlay_w}:{overlay_h},fps={FPS},format=rgba[av];"
+            f"[3:v]crop=ih:ih:(iw-ih)/2:0,scale={overlay_w}:{overlay_h},fps={FPS},format=gray[mt];"
+            f"[av][mt]alphamerge,format=yuva420p,"
+            f"fade=t=in:st={lead_in_sec:.3f}:d=0.20:alpha=1,"
+            f"fade=t=out:st={fade_out_st:.3f}:d=0.20:alpha=1[fg];"
+            f"[0:v][fg]overlay=x={avatar_x}:y={avatar_y}:shortest=1:format=auto[vout]"
+        )
+        enc_cmd.extend(
+            [
+                "-i",
+                str(avatar_mp4_path),
+                "-stream_loop",
+                "-1",
+                "-i",
+                str(avatar_matte_path),
+                "-filter_complex",
+                filter_complex,
+                "-map",
+                "[vout]",
+                "-map",
+                "1:a",
+            ]
+        )
+
+    enc_cmd.extend(
+        [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            "-shortest",
+            str(output_mp4),
+        ]
+    )
 
     enc_proc = subprocess.Popen(
         enc_cmd,

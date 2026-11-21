@@ -12,6 +12,7 @@ import sys
 from PIL import Image
 
 from src.audio_master import master_slide_audio
+from src.avatar_sync import AVATAR_MATTE_MP4, render_synced_avatar
 from src.models import SlideVideoManifest
 from src.script_parser import build_fr_subtitle_chunks, parse_bilingual_script
 from src.slide_compositor import (
@@ -32,6 +33,7 @@ SCRIPTS_DIR = STUDIO_ROOT / "scripts_input"
 SLIDES_DIR = STUDIO_ROOT / "slides_input"
 AUDIO_OUT_DIR = STUDIO_ROOT / "audio_out"
 VIDEO_OUT_DIR = STUDIO_ROOT / "video_out"
+AVATAR_OUT_DIR = STUDIO_ROOT / "output"
 
 DEFAULT_LEAD_IN_SEC = 1.5
 DEFAULT_TAIL_OUT_SEC = 1.5
@@ -109,6 +111,7 @@ def process_slide(
     export_dir: Path | None = DEFAULT_EXPORT_DIR,
     subtitle_y: float = DEFAULT_SUBTITLE_Y,
     subtitle_font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
+    use_avatar: bool = True,
 ) -> SlideVideoManifest:
     """Pairs an existing slide asset in `slides_input/` with narration audio & `[FR]` subtitles."""
     script_path = _resolve_script_path(slide_id)
@@ -149,6 +152,16 @@ def process_slide(
         tail_out_sec=tail_out_sec,
     )
 
+    avatar_mp4_path: Path | None = None
+    avatar_render_sec = 0.0
+    if with_video and use_avatar:
+        avatar_out = AVATAR_OUT_DIR / f"{slide_id}_avatar.mp4"
+        avatar_mp4_path, avatar_render_sec = render_synced_avatar(
+            slide_id=slide_id,
+            master_wav_path=Path(master.master_wav_path),
+            output_mp4_path=avatar_out,
+        )
+
     rendered_mp4_path: str | None = None
     if with_video:
         assert slide_media_path is not None
@@ -161,6 +174,10 @@ def process_slide(
             video_out_dir=VIDEO_OUT_DIR,
             subtitle_y=subtitle_y,
             subtitle_font_size=subtitle_font_size,
+            avatar_mp4_path=avatar_mp4_path,
+            avatar_matte_path=AVATAR_MATTE_MP4 if use_avatar else None,
+            lead_in_sec=lead_in_sec,
+            tail_out_sec=tail_out_sec,
         )
         rendered_mp4_path = str(mp4_path.resolve())
 
@@ -201,6 +218,8 @@ def process_slide(
         exported_mp4_path=exported_mp4_path,
         subtitle_y=subtitle_y,
         subtitle_font_size=subtitle_font_size,
+        avatar_enabled=use_avatar,
+        avatar_render_sec=avatar_render_sec,
     )
 
     manifest_path = VIDEO_OUT_DIR / f"{slide_id}_manifest.json"
@@ -287,6 +306,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_SUBTITLE_FONT_SIZE,
         help="French subtitle font size in pixels (default: 46 for briefing room readability).",
     )
+    parser.add_argument(
+        "--no-avatar",
+        action="store_true",
+        help="Disable MuseTalk speech-synced avatar overlay in top-right corner.",
+    )
     return parser.parse_args(argv)
 
 
@@ -335,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
             export_dir=export_dir,
             subtitle_y=args.subtitle_y,
             subtitle_font_size=args.subtitle_font_size,
+            use_avatar=not args.no_avatar,
         )
         manifests.append(manifest.to_dict())
 

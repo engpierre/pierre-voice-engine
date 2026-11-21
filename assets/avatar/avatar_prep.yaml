@@ -1,0 +1,7 @@
+pierre_avatar:
+  preparation: False
+  bbox_shift: 0
+  video_path: "C:/Anti-Gravity-Core/training-video-studio/assets/avatar/avatar_base_9s.mp4"
+  audio_clips:
+    test_avatar_sync: "C:/Anti-Gravity-Core/training-video-studio/audio_out/ai_fluency_02.wav"
+

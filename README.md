@@ -12,7 +12,8 @@ Isolated workspace for producing bilingual English voiceovers (with badge-free F
 | `scripts_input/` | Per-slide bilingual scripts (`<slide_id>.txt` or `.md`) with `[EN]` narration (`25s–30s` target, `<= 115` word cap) and optional `[FR]` subtitle blocks. |
 | `audio_out/` | EBU R128 (`I=-14.0 LUFS`, `TP=-1.5 dB`, `LRA=11.0`) + `atempo=1.04x` mastered voiceover `.wav` / `.mp3` outputs. |
 | `video_out/` | Rendered `1920x1080` 30fps H.264/AAC `.mp4` training slides and `<slide_id>_manifest.json` telemetry. |
-| `src/` | Decoupled narration & compositing engine (`models.py`, `script_parser.py`, `tts_client.py`, `audio_master.py`, `slide_compositor.py`, `narrator_cli.py`). |
+| `src/` | Decoupled narration & compositing engine (`models.py`, `script_parser.py`, `tts_client.py`, `audio_master.py`, `slide_compositor.py`, `avatar_sync.py`, `narrator_cli.py`). |
+| `assets/avatar/` | Reusable base avatar loop (`avatar_base_9s.mp4`), alpha matte (`avatar_base_9s_matte.mp4`), and pre-computed MuseTalk cache (`coords.pkl`, `latents.pt`). |
 
 ---
 
@@ -54,7 +55,16 @@ C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe
 
 ## 4. Shared Read-Only Voice Assets & Hardware Hygiene
 
-- **Zero Weight Duplication:** Consumes the existing Qwen3-TTS server (`C:\Anti-Gravity-Core\pierre-training-video\voice_studio\tts_server.py`, `http://127.0.0.1:7861`, pinned to `cuda:1`) and read-only reference audio (`pierre_ref.wav` / `pierre_ref_master.wav`) without copying model checkpoints.
-- **GPU 1 VRAM Guard:** Pre-flight checks `GPU 1` free VRAM before TTS boot; if `< 6000 MiB` free due to idle `qwen3.8-hardened:27b` weights in Ollama, sends `keep_alive: 0` cleanly to `http://127.0.0.1:11434/api/generate` without restarting the Ollama daemon.
+- **Zero Weight Duplication:** Consumes the existing Qwen3-TTS server (`C:\Anti-Gravity-Core\pierre-training-video\voice_studio\tts_server.py`, `http://localhost:7861`, pinned to `cuda:1`) and read-only reference audio (`pierre_ref.wav` / `pierre_ref_master.wav`) without copying model checkpoints.
+- **GPU 1 VRAM Guard:** Pre-flight checks `GPU 1` free VRAM before TTS boot; if `< 6000 MiB` free due to idle `qwen3.8-hardened:27b` weights in Ollama, sends `keep_alive: 0` cleanly to `http://localhost:11434/api/generate` without restarting the Ollama daemon.
 - **Strict Ephemeral Teardown:** `tts_server.py` runs inside `try...finally` and is terminated immediately after synthesis so `GPU 0` (`cuda:0`) and `GPU 1` (`cuda:1`) return to `0 MiB` studio allocation.
 - **Subsystem Isolation:** Zero writes are performed against `pierre-training-video/pipeline/`, OpenClaw daemons, `app_eel.py`, `pierre_quant.db`, `chronos_intel_buffer.json`, or `pierres_power_scraper/`.
+
+---
+
+## 5. Speech-Windowed Avatar Lip-Sync Overlay (MuseTalk v1.5)
+
+- **Isolated Runtime (`.venv_musetalk`):** Dedicated Python 3.10 virtual environment pinned to `cuda:1` (Blackwell RTX 5060 Ti compatible with PyTorch `2.11.0+cu128`), fully decoupled from the primary studio venv.
+- **Deterministic Canvas Placement:** Dynamically computes active slide canvas boundaries (`_compute_slide_canvas_rect`) to ensure the `170x170` px avatar overlays squarely within the slide visual area (`AVATAR_RIGHT_INSET_PCT = 0.10`, `AVATAR_TOP_INSET_PCT = 0.11`) regardless of presentation aspect ratio or letterboxing.
+- **Speech-Window Synchronization:** Transparent alpha-merged overlay with `0.20s` fade-in at speech onset (`t = 1.5s`) and `0.20s` fade-out at speech conclusion before the `1.5s` tail-out buffer. Pass `--no-avatar` to render audio and subtitles without the avatar overlay.
+- **Alpha Matte Pipeline:** Pre-computed 450-frame grayscale matte video (`assets/avatar/avatar_base_9s_matte.mp4`) matching MuseTalk's 25 FPS ping-pong loop for zero-overhead realtime composite via FFmpeg `alphamerge`.

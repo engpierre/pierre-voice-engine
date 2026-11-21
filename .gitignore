@@ -2,6 +2,11 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv_musetalk/
+vendor/
+output/
+assets/avatar/cache/
+assets/avatar/*.mp4
 .env
 *.bak
 *.tmp
