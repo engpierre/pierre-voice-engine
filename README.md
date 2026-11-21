@@ -30,8 +30,11 @@ C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe
 # Render mastered WAV + MP3 audio only (skip MP4 composition)
 C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide hitl_autonomy_01 --audio-only
 
-# Custom lead-in silence (default 1.5s), raised subtitle position, and final-only MP4 export destination (default OneDrive folder)
-C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide agent_vs_skill_01 --lead-in-sec 1.5 --subtitle-y 0.65 --subtitle-font-size 46 --export-dir "C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide"
+# Standard single-slide run with bottom large subtitles (y=0.91, 46px), 1.5s lead-in + 1.5s tail-out airspace, and OneDrive MP4 export
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide agent_vs_skill_01
+
+# Override parameters if desired (e.g. custom lead-in, tail-out, or export dir)
+C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --slide agent_vs_skill_01 --lead-in-sec 1.5 --tail-out-sec 1.5 --subtitle-y 0.91 --subtitle-font-size 46 --export-dir "C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide"
 
 # Batch-process every script in scripts_input/
 C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe -m src.narrator_cli --all --with-video
@@ -39,10 +42,11 @@ C:\Anti-Gravity-Core\pierre-training-video\video_studio\.venv\Scripts\python.exe
 
 ---
 
-## 3. Animated Slide Input, Voice Lead-In & Subtitle Typography Spec
+## 3. Subtitle Typography, Airspace Buffers & Vocal Cadence Spec
 
-- **Raised High-Contrast Subtitles:** French subtitles sit in the mid-lower transition band (`y ~ 63%–68%` of 1080p, defaulting to `0.65` / `~702px`) right above `CORE FRAMEWORK` cards and use a large bold font (`44–48 px`, default `46px`) wrapped safely (`<= 52` chars/line, max 2 lines) over a dark translucent backdrop (`rgba(8, 16, 28, 230)`) with cyan border and **strictly NO `FR` badge box**.
-- **1.5s Voice Lead-In (Pre-Roll):** Mastered audio inserts `1.5s` of digital silence via FFmpeg `adelay` after EBU R128 loudness normalization. Subtitles begin strictly at `t = lead_in_sec` (clean silent slide view during pre-roll) to guarantee opening syllables are never clipped during PowerPoint slide transitions.
+- **Bottom Large Subtitles (Badge-Free):** French subtitles sit anchored in the bottom lower-third margin (`y ~ 90%–93%` of 1080p, defaulting to `0.91` / `~983px`) using a large bold font (`44–48 px`, default `46px`) wrapped safely (`<= 52` chars/line, max 2 lines) over a dark translucent backdrop (`rgba(8, 16, 28, 230)`) with cyan border and **strictly NO `FR` badge box**.
+- **1.5s Lead-In & 1.5s Tail-Out Airspace:** Mastered audio inserts `1.5s` of digital silence before speech (`--lead-in-sec 1.5`) and `1.5s` trailing buffer after the final word (`--tail-out-sec 1.5`) via FFmpeg `adelay` and `apad` so slide transitions never feel clipped or abrupt (`total duration <= 45.0s`). Subtitles appear synchronously at `t = 1.5s` and clear cleanly when speech resolves before the tail airspace.
+- **Natural Vocal Ramp-In & Closing Cadence:** Applies smooth audio envelope shaping (`afade=t=in:st=0:d=0.20` at speech onset and `afade=t=out:st=speech_dur-0.25:d=0.25` at the tail of the final clause) with `atempo=1.04x` and two-pass linear EBU R128 (`-14.0 LUFS`, `-1.5 dBTP`) to eliminate onset pops and ensure clauses resolve naturally.
 - **Final-Only MP4 OneDrive Export:** Upon completion, `narrator_cli.py` copies **strictly and exclusively** the final `<slide_id>.mp4` to `--export-dir` (`C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide`), leaving intermediate `.wav`, `.mp3`, and `.json` files cleanly isolated in studio working directories.
 - **Veo / Animated `.mp4` Preference:** When `slides_input/<slide_id>.mp4` exists, `slide_compositor.py` normalizes it to `1920x1080` at `30 fps` and loops/trims cleanly to the mastered audio duration without adding artificial zoom distortion. Static `.png` inputs retain the smooth `1.00x -> 1.03x` zoom/drift fallback.
 

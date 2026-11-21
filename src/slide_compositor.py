@@ -32,7 +32,7 @@ CYAN_ACCENT_RGB = (0, 229, 255)
 TRACK_BG_RGB = (22, 34, 52)
 TEXT_WHITE_RGBA = (255, 255, 255, 255)
 
-DEFAULT_SUBTITLE_Y = 0.65
+DEFAULT_SUBTITLE_Y = 0.91
 DEFAULT_SUBTITLE_FONT_SIZE = 46
 
 
@@ -194,7 +194,7 @@ def _find_active_chunk(chunks: list[SubtitleChunk], timestamp_sec: float) -> Sub
     for chunk in chunks:
         if chunk.start_sec <= timestamp_sec < chunk.end_sec:
             return chunk
-    return chunks[-1] if timestamp_sec >= chunks[-1].start_sec else None
+    return None
 
 
 def _read_exact_frame(stream: IO[bytes], byte_count: int) -> bytes:

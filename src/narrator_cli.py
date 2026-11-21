@@ -34,6 +34,7 @@ AUDIO_OUT_DIR = STUDIO_ROOT / "audio_out"
 VIDEO_OUT_DIR = STUDIO_ROOT / "video_out"
 
 DEFAULT_LEAD_IN_SEC = 1.5
+DEFAULT_TAIL_OUT_SEC = 1.5
 DEFAULT_EXPORT_DIR = Path(r"C:\Users\Pierre\OneDrive\Bureau\Google antigravity voice slide")
 
 
@@ -104,6 +105,7 @@ def process_slide(
     slide_id: str,
     with_video: bool = True,
     lead_in_sec: float = DEFAULT_LEAD_IN_SEC,
+    tail_out_sec: float = DEFAULT_TAIL_OUT_SEC,
     export_dir: Path | None = DEFAULT_EXPORT_DIR,
     subtitle_y: float = DEFAULT_SUBTITLE_Y,
     subtitle_font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
@@ -137,12 +139,14 @@ def process_slide(
         audio_out_dir=AUDIO_OUT_DIR,
         remove_raw=True,
         lead_in_sec=lead_in_sec,
+        tail_out_sec=tail_out_sec,
     )
 
     subtitle_chunks = build_fr_subtitle_chunks(
         fr_text=bilingual.fr_text,
         total_duration_sec=master.mastered_duration_sec,
         lead_in_sec=lead_in_sec,
+        tail_out_sec=tail_out_sec,
     )
 
     rendered_mp4_path: str | None = None
@@ -193,6 +197,7 @@ def process_slide(
         slide_media_type=slide_media_type,
         fr_auto_translated=bilingual.fr_auto_translated,
         lead_in_sec=lead_in_sec,
+        tail_out_sec=tail_out_sec,
         exported_mp4_path=exported_mp4_path,
         subtitle_y=subtitle_y,
         subtitle_font_size=subtitle_font_size,
@@ -259,6 +264,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Silent voice pre-roll duration in seconds (default: 1.5s for PowerPoint playback).",
     )
     parser.add_argument(
+        "--tail-out-sec",
+        type=float,
+        default=DEFAULT_TAIL_OUT_SEC,
+        help="Silent voice trailing buffer in seconds (default: 1.5s for clean slide transition).",
+    )
+    parser.add_argument(
         "--export-dir",
         type=str,
         default=str(DEFAULT_EXPORT_DIR),
@@ -268,7 +279,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--subtitle-y",
         type=float,
         default=DEFAULT_SUBTITLE_Y,
-        help="Vertical subtitle position (fraction 0.0-1.0 of 1080p height or pixel coordinate, default: 0.65).",
+        help="Vertical subtitle position (fraction 0.0-1.0 of 1080p height or pixel coordinate, default: 0.91).",
     )
     parser.add_argument(
         "--subtitle-font-size",
@@ -320,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
             slide_id=slide_id,
             with_video=with_video,
             lead_in_sec=args.lead_in_sec,
+            tail_out_sec=args.tail_out_sec,
             export_dir=export_dir,
             subtitle_y=args.subtitle_y,
             subtitle_font_size=args.subtitle_font_size,

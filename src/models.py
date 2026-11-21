@@ -43,6 +43,7 @@ class AudioMasterResult:
     max_volume_db: float
     target_lufs: float
     lead_in_sec: float = 0.0
+    tail_out_sec: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -71,8 +72,9 @@ class SlideVideoManifest:
     slide_media_type: str = "static_png"
     fr_auto_translated: bool = False
     lead_in_sec: float = 0.0
+    tail_out_sec: float = 0.0
     exported_mp4_path: str | None = None
-    subtitle_y: float = 0.64
+    subtitle_y: float = 0.91
     subtitle_font_size: int = 46
 
     def to_dict(self) -> dict[str, object]:

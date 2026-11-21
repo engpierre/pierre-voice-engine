@@ -28,6 +28,7 @@ TARGET_LRA = 11.0
 ATEMPO_FACTOR = 1.04
 MAX_DURATION_SEC = 45.0
 DEFAULT_LEAD_IN_SEC = 1.5
+DEFAULT_TAIL_OUT_SEC = 1.5
 SAMPLE_RATE_HZ = 44100
 CHANNELS = 2
 
@@ -118,8 +119,8 @@ def probe_volume_db(media_path: Path) -> tuple[float, float]:
     return float(mean_match.group(1)), float(max_match.group(1))
 
 
-def _measure_loudnorm_pass1(ffmpeg_bin: str, raw_wav_path: Path) -> dict[str, str]:
-    """Runs pass-1 EBU R128 analysis on trimmed + tempo-scaled speech and parses JSON stats."""
+def _measure_loudnorm_pass1(ffmpeg_bin: str, raw_wav_path: Path) -> tuple[dict[str, str], float]:
+    """Runs pass-1 EBU R128 analysis on trimmed + tempo-scaled speech and returns (stats, speech_dur_sec)."""
     analysis_chain = (
         f"{SILENCEREMOVE_FILTER},"
         f"atempo={ATEMPO_FACTOR:.2f},"
@@ -147,13 +148,22 @@ def _measure_loudnorm_pass1(ffmpeg_bin: str, raw_wav_path: Path) -> dict[str, st
             f"Could not parse FFmpeg loudnorm pass-1 JSON telemetry:\n{proc.stderr}"
         )
     parsed: dict[str, object] = json.loads(json_match.group(0))
-    return {
+
+    time_matches = re.findall(r"time=(\d+):(\d+):([\d.]+)", proc.stderr)
+    if time_matches:
+        h, m, s = time_matches[-1]
+        speech_dur = round(int(h) * 3600 + int(m) * 60 + float(s), 3)
+    else:
+        speech_dur = round(probe_duration_sec(raw_wav_path) / ATEMPO_FACTOR, 3)
+
+    stats = {
         "input_i": str(parsed["input_i"]),
         "input_tp": str(parsed["input_tp"]),
         "input_lra": str(parsed["input_lra"]),
         "input_thresh": str(parsed["input_thresh"]),
         "target_offset": str(parsed["target_offset"]),
     }
+    return stats, speech_dur
 
 
 def master_slide_audio(
@@ -162,8 +172,9 @@ def master_slide_audio(
     audio_out_dir: Path,
     remove_raw: bool = True,
     lead_in_sec: float = DEFAULT_LEAD_IN_SEC,
+    tail_out_sec: float = DEFAULT_TAIL_OUT_SEC,
 ) -> AudioMasterResult:
-    """Applies two-pass linear EBU R128 + `1.04x` tempo mastering with lead-in pre-roll."""
+    """Applies two-pass linear EBU R128 + `1.04x` mastering with lead-in, tail buffer, and envelope shaping."""
     if not raw_wav_path.exists():
         raise FileNotFoundError(f"Raw TTS WAV missing: {raw_wav_path}")
 
@@ -174,10 +185,17 @@ def master_slide_audio(
     master_mp3_path = audio_out_dir / f"{slide_id}.mp3"
 
     raw_duration_sec = probe_duration_sec(raw_wav_path)
-    stats = _measure_loudnorm_pass1(ffmpeg_bin, raw_wav_path)
+    stats, speech_dur = _measure_loudnorm_pass1(ffmpeg_bin, raw_wav_path)
 
     delay_ms = int(round(max(0.0, lead_in_sec) * 1000))
     delay_stage = f"adelay={delay_ms}|{delay_ms}:all=1," if delay_ms > 0 else ""
+    pad_stage = f"apad=pad_dur={max(0.0, tail_out_sec):.3f}," if tail_out_sec > 0 else ""
+
+    fade_out_st = max(0.0, speech_dur - 0.25)
+    fade_stage = (
+        f"afade=t=in:st=0:d=0.20,"
+        f"afade=t=out:st={fade_out_st:.3f}:d=0.25,"
+    )
 
     pass2_chain = (
         f"{SILENCEREMOVE_FILTER},"
@@ -189,7 +207,9 @@ def master_slide_audio(
         f"measured_LRA={stats['input_lra']}:measured_thresh={stats['input_thresh']}:"
         f"offset={stats['target_offset']}:linear=true:print_format=none,"
         f"aresample={SAMPLE_RATE_HZ},"
+        f"{fade_stage}"
         f"{delay_stage}"
+        f"{pad_stage}"
         "alimiter=limit=0.84:level=false:asc=false,"
         "aformat=sample_fmts=s16:channel_layouts=stereo"
     )
@@ -261,4 +281,5 @@ def master_slide_audio(
         max_volume_db=max_volume_db,
         target_lufs=TARGET_LUFS,
         lead_in_sec=lead_in_sec,
+        tail_out_sec=tail_out_sec,
     )
