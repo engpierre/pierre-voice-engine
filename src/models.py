@@ -72,6 +72,8 @@ class SlideVideoManifest:
     fr_auto_translated: bool = False
     lead_in_sec: float = 0.0
     exported_mp4_path: str | None = None
+    subtitle_y: float = 0.64
+    subtitle_font_size: int = 46
 
     def to_dict(self) -> dict[str, object]:
         """Serializes manifest dataclass fields to a JSON-ready dictionary."""

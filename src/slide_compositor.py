@@ -14,7 +14,6 @@ from src.models import SubtitleChunk
 
 CANVAS_W = 1920
 CANVAS_H = 1080
-VIEWPORT_H = 1006
 FPS = 30
 STATIC_ZOOM_START = 1.00
 STATIC_ZOOM_END = 1.03
@@ -27,11 +26,14 @@ FONT_BOLD = FONT_DIR / "BeVietnamPro-Bold.ttf"
 FONT_MEDIUM = FONT_DIR / "BeVietnamPro-Medium.ttf"
 
 SLATE_BG_RGB = (5, 10, 18)
-PILL_BG_RGBA = (8, 16, 28, 224)
-PILL_BORDER_RGBA = (56, 189, 248, 150)
+PILL_BG_RGBA = (8, 16, 28, 230)
+PILL_BORDER_RGBA = (56, 189, 248, 180)
 CYAN_ACCENT_RGB = (0, 229, 255)
 TRACK_BG_RGB = (22, 34, 52)
-TEXT_WHITE_RGBA = (248, 250, 252, 255)
+TEXT_WHITE_RGBA = (255, 255, 255, 255)
+
+DEFAULT_SUBTITLE_Y = 0.65
+DEFAULT_SUBTITLE_FONT_SIZE = 46
 
 
 def resolve_slide_media_path(slides_dir: Path, slide_id: str) -> tuple[Path, str]:
@@ -67,21 +69,21 @@ def _load_font(bold: bool, size: int) -> ImageFont.FreeTypeFont | ImageFont.Imag
 
 
 def _prepare_base_slide(slide_png_path: Path) -> Image.Image:
-    """Loads source static slide PNG and fits/pads proportionally into 1920x1006 viewport."""
+    """Loads source static slide PNG and fits/pads proportionally into 1920x1080 canvas."""
     if not slide_png_path.exists():
         raise FileNotFoundError(f"Slide image missing: {slide_png_path}")
 
     with Image.open(slide_png_path) as src:
         rgba = src.convert("RGBA")
 
-    scale = min(CANVAS_W / rgba.width, VIEWPORT_H / rgba.height)
+    scale = min(CANVAS_W / rgba.width, CANVAS_H / rgba.height)
     new_w = max(1, int(round(rgba.width * scale)))
     new_h = max(1, int(round(rgba.height * scale)))
     resized = rgba.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
-    canvas = Image.new("RGB", (CANVAS_W, VIEWPORT_H), SLATE_BG_RGB)
+    canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), SLATE_BG_RGB)
     offset_x = (CANVAS_W - new_w) // 2
-    offset_y = (VIEWPORT_H - new_h) // 2
+    offset_y = (CANVAS_H - new_h) // 2
     canvas.paste(resized, (offset_x, offset_y), resized)
     return canvas
 
@@ -89,10 +91,11 @@ def _prepare_base_slide(slide_png_path: Path) -> Image.Image:
 def _wrap_text_to_width(
     text: str,
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
-    max_width_px: int,
+    max_width_px: int = 1600,
+    max_chars_per_line: int = 52,
     max_lines: int = 2,
 ) -> list[str]:
-    """Wraps subtitle text cleanly into balanced lines constrained by rendered pixel width."""
+    """Wraps subtitle text cleanly into balanced lines constrained by pixel width and char count."""
     words = text.split()
     if not words:
         return []
@@ -101,7 +104,7 @@ def _wrap_text_to_width(
     current = ""
     for word in words:
         trial = f"{current} {word}".strip() if current else word
-        if current and font.getlength(trial) > max_width_px:
+        if current and (font.getlength(trial) > max_width_px or len(trial) > max_chars_per_line):
             lines.append(current)
             current = word
         else:
@@ -114,10 +117,11 @@ def _wrap_text_to_width(
 
     kept = lines[: max_lines - 1]
     tail = " ".join(lines[max_lines - 1 :])
-    while font.getlength(f"{tail}...") > max_width_px and " " in tail:
+    while (font.getlength(f"{tail}...") > max_width_px or len(tail) > max_chars_per_line) and " " in tail:
         tail = tail.rsplit(" ", 1)[0]
-    if font.getlength(tail) > max_width_px and len(tail) > 4:
-        tail = f"{tail[:48].rstrip()}..."
+    if (font.getlength(tail) > max_width_px or len(tail) > max_chars_per_line) and len(tail) > 4:
+        safe_cut = min(len(tail), max_chars_per_line - 4)
+        tail = f"{tail[:safe_cut].rstrip()}..."
     kept.append(tail)
     return kept
 
@@ -125,30 +129,39 @@ def _wrap_text_to_width(
 def _build_subtitle_pill(
     chunk: SubtitleChunk,
     text_font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    subtitle_y: float = DEFAULT_SUBTITLE_Y,
+    font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
 ) -> tuple[Image.Image, int, int]:
-    """Renders a clean dark translucent lower-third strip inside the non-occluding dock."""
-    pad_x = 34
-    pad_y = 10
-    max_text_w = 1680
+    """Renders a raised high-contrast French subtitle pill without FR badge."""
+    pad_x = 42
+    pad_y = 16
+    max_text_w = 1600
+    max_chars_per_line = 52
 
-    lines = _wrap_text_to_width(chunk.text, text_font, max_width_px=max_text_w, max_lines=2)
+    lines = _wrap_text_to_width(
+        chunk.text,
+        text_font,
+        max_width_px=max_text_w,
+        max_chars_per_line=max_chars_per_line,
+        max_lines=2,
+    )
     if not lines:
         lines = [chunk.text]
 
     line_widths = [int(math.ceil(text_font.getlength(line))) for line in lines]
     content_text_w = max(line_widths, default=200)
-    line_height = 30
+    line_height = int(round(font_size * 1.25))
     total_text_h = len(lines) * line_height
 
-    pill_w = min(1820, max(500, pad_x * 2 + content_text_w))
-    pill_h = max(52, pad_y * 2 + total_text_h)
+    pill_w = min(1760, max(560, pad_x * 2 + content_text_w))
+    pill_h = max(60, pad_y * 2 + total_text_h)
 
     pill = Image.new("RGBA", (pill_w, pill_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(pill)
 
     draw.rounded_rectangle(
         (0, 0, pill_w - 1, pill_h - 1),
-        radius=14,
+        radius=16,
         fill=PILL_BG_RGBA,
         outline=PILL_BORDER_RGBA,
         width=2,
@@ -166,7 +179,11 @@ def _build_subtitle_pill(
         )
 
     pos_x = (CANVAS_W - pill_w) // 2
-    pos_y = VIEWPORT_H + max(2, (CANVAS_H - 4 - VIEWPORT_H - pill_h) // 2)
+    if 0.0 < subtitle_y <= 1.0:
+        pos_y = int(round(CANVAS_H * subtitle_y - pill_h / 2.0))
+    else:
+        pos_y = int(round(subtitle_y))
+    pos_y = max(10, min(CANVAS_H - pill_h - 10, pos_y))
     return pill, pos_x, pos_y
 
 
@@ -223,6 +240,8 @@ def render_slide_video(
     video_out_dir: Path,
     slide_media_path: Path | None = None,
     slide_png_path: Path | None = None,
+    subtitle_y: float = DEFAULT_SUBTITLE_Y,
+    subtitle_font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
 ) -> Path:
     """Renders 1920x1080 30fps H.264/AAC MP4 from animated `.mp4` (Veo) or static `.png` slide."""
     resolved_media = slide_media_path or slide_png_path
@@ -239,9 +258,15 @@ def render_slide_video(
     video_out_dir.mkdir(parents=True, exist_ok=True)
     output_mp4 = video_out_dir / f"{slide_id}.mp4"
 
-    text_font = _load_font(bold=True, size=25)
+    text_font = _load_font(bold=True, size=subtitle_font_size)
     pill_cache: dict[int, tuple[Image.Image, int, int]] = {
-        chunk.index: _build_subtitle_pill(chunk, text_font) for chunk in subtitle_chunks
+        chunk.index: _build_subtitle_pill(
+            chunk,
+            text_font,
+            subtitle_y=subtitle_y,
+            font_size=subtitle_font_size,
+        )
+        for chunk in subtitle_chunks
     }
 
     total_frames = max(1, int(math.ceil(duration_sec * FPS)))
@@ -297,8 +322,8 @@ def render_slide_video(
     try:
         if is_animated:
             dec_vf = (
-                f"scale={CANVAS_W}:{VIEWPORT_H}:force_original_aspect_ratio=decrease,"
-                f"pad={CANVAS_W}:{CANVAS_H}:(ow-iw)/2:0:color=#050a12,"
+                f"scale={CANVAS_W}:{CANVAS_H}:force_original_aspect_ratio=decrease,"
+                f"pad={CANVAS_W}:{CANVAS_H}:(ow-iw)/2:(oh-ih)/2:color=#050a12,"
                 f"fps={FPS}"
             )
             dec_cmd = [
@@ -357,21 +382,19 @@ def render_slide_video(
                 zoom = STATIC_ZOOM_START + (STATIC_ZOOM_END - STATIC_ZOOM_START) * progress
 
                 crop_w = CANVAS_W / zoom
-                crop_h = VIEWPORT_H / zoom
+                crop_h = CANVAS_H / zoom
                 left = (CANVAS_W - crop_w) / 2.0
-                top = (VIEWPORT_H - crop_h) / 2.0
+                top = (CANVAS_H - crop_h) / 2.0
                 right = left + crop_w
                 bottom = top + crop_h
 
                 viewport = base_slide.resize(
-                    (CANVAS_W, VIEWPORT_H),
+                    (CANVAS_W, CANVAS_H),
                     resample=Image.Resampling.BILINEAR,
                     box=(left, top, right, bottom),
                 )
-                frame = Image.new("RGB", (CANVAS_W, CANVAS_H), SLATE_BG_RGB)
-                frame.paste(viewport, (0, 0))
                 composed = _overlay_subtitles_and_bar(
-                    frame, frame_idx, total_frames, subtitle_chunks, pill_cache
+                    viewport, frame_idx, total_frames, subtitle_chunks, pill_cache
                 )
                 enc_proc.stdin.write(composed.tobytes())
     finally:

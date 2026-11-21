@@ -1,0 +1,6 @@
+[EN]
+This slide contrasts AI Agents against AI Skills in autonomous systems. An AI Agent is the autonomous entity that goes on a mission—it reasons, plans multi-step workflows, maintains memory and state, and decides when to invoke capabilities. In contrast, an AI Skill is a specialized, single-purpose module that remains passive until called to execute a deterministic task like search, calculation, or data parsing. Simply put, the agent provides agency and memory, while the skill provides focused execution.
+
+[FR]
+Cette diapositive compare les agents d'IA aux compétences d'IA dans les systèmes autonomes. Un agent d'IA est l'entité autonome qui mène une mission : il raisonne, planifie des flux en plusieurs étapes, gère sa mémoire et décide quand mobiliser des outils. À l'inverse, une compétence d'IA est un module spécialisé à usage unique qui exécute une tâche précise comme la recherche ou le calcul. En bref, l'agent apporte l'autonomie et la mémoire, tandis que la compétence assure l'exécution ciblée.
+

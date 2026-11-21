@@ -17,6 +17,8 @@ from src.script_parser import build_fr_subtitle_chunks, parse_bilingual_script
 from src.slide_compositor import (
     CANVAS_H,
     CANVAS_W,
+    DEFAULT_SUBTITLE_FONT_SIZE,
+    DEFAULT_SUBTITLE_Y,
     FPS,
     STATIC_ZOOM_END,
     STATIC_ZOOM_START,
@@ -103,6 +105,8 @@ def process_slide(
     with_video: bool = True,
     lead_in_sec: float = DEFAULT_LEAD_IN_SEC,
     export_dir: Path | None = DEFAULT_EXPORT_DIR,
+    subtitle_y: float = DEFAULT_SUBTITLE_Y,
+    subtitle_font_size: int = DEFAULT_SUBTITLE_FONT_SIZE,
 ) -> SlideVideoManifest:
     """Pairs an existing slide asset in `slides_input/` with narration audio & `[FR]` subtitles."""
     script_path = _resolve_script_path(slide_id)
@@ -151,6 +155,8 @@ def process_slide(
             duration_sec=master.mastered_duration_sec,
             subtitle_chunks=subtitle_chunks,
             video_out_dir=VIDEO_OUT_DIR,
+            subtitle_y=subtitle_y,
+            subtitle_font_size=subtitle_font_size,
         )
         rendered_mp4_path = str(mp4_path.resolve())
 
@@ -188,6 +194,8 @@ def process_slide(
         fr_auto_translated=bilingual.fr_auto_translated,
         lead_in_sec=lead_in_sec,
         exported_mp4_path=exported_mp4_path,
+        subtitle_y=subtitle_y,
+        subtitle_font_size=subtitle_font_size,
     )
 
     manifest_path = VIDEO_OUT_DIR / f"{slide_id}_manifest.json"
@@ -256,6 +264,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=str(DEFAULT_EXPORT_DIR),
         help="Destination directory for final PowerPoint MP4 only (default: OneDrive folder). Pass 'none' to disable.",
     )
+    parser.add_argument(
+        "--subtitle-y",
+        type=float,
+        default=DEFAULT_SUBTITLE_Y,
+        help="Vertical subtitle position (fraction 0.0-1.0 of 1080p height or pixel coordinate, default: 0.65).",
+    )
+    parser.add_argument(
+        "--subtitle-font-size",
+        type=int,
+        default=DEFAULT_SUBTITLE_FONT_SIZE,
+        help="French subtitle font size in pixels (default: 46 for briefing room readability).",
+    )
     return parser.parse_args(argv)
 
 
@@ -301,6 +321,8 @@ def main(argv: list[str] | None = None) -> int:
             with_video=with_video,
             lead_in_sec=args.lead_in_sec,
             export_dir=export_dir,
+            subtitle_y=args.subtitle_y,
+            subtitle_font_size=args.subtitle_font_size,
         )
         manifests.append(manifest.to_dict())
 
